@@ -2,10 +2,12 @@ import logging
 
 from aiogram import Router, F
 from aiogram.enums import ParseMode, ChatType
-from aiogram.filters import Command, ChatMemberUpdatedFilter, PROMOTED_TRANSITION, LEAVE_TRANSITION
+from aiogram.filters import ChatMemberUpdatedFilter, PROMOTED_TRANSITION, LEAVE_TRANSITION
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import Message, InlineKeyboardButton, ChatMemberUpdated
+from aiogram.types import InlineKeyboardButton, ChatMemberUpdated
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from database.repo import remove_chat_from_user
 
 # -1002210982753
 
@@ -48,14 +50,17 @@ async def on_bot_promoted(event: ChatMemberUpdated):
     )
 
 
-async def handle_bot_kicked(id: int):
-    pass
-
-
-@router.my_chat_member(ChatMemberUpdatedFilter(LEAVE_TRANSITION))
+@router.my_chat_member(ChatMemberUpdatedFilter(LEAVE_TRANSITION), F.chat.type != ChatType.PRIVATE)
 async def on_bot_kicked(event: ChatMemberUpdated):
-    logger.info("on_bot_kicked - %s", event.model_dump_json(indent=4, exclude_none=True))
-    await handle_bot_kicked(event.chat.id)
+    logger.info(f"on_bot_kicked from {event.chat.id}")
+    user_ids = await remove_chat_from_user(event.chat.id)
+    for user_id in user_ids:
+        try:
+            chat_name = event.chat.username if event.chat.username else event.chat.title
+            await event.bot.send_message(chat_id=user_id, text=f"Бот больше не администратор чата {chat_name}.\n"
+                                                               f"Убрали его из списка")
+        except Exception as e:
+            logger.exception(f"Ошибка при отправке сообщения {user_id} ")
 
 # channel_id = -1002210982753
 

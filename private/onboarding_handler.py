@@ -2,20 +2,25 @@ import asyncio
 import logging
 
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.enums import ChatType
+from aiogram.filters import CommandStart, ChatMemberUpdatedFilter, LEAVE_TRANSITION
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
 
+from database.repo import add_user, add_chat_to_user, AddChatStatus, set_user_blocked
 from public.adding_handler import AddingConfirmed
 
 logger = logging.getLogger(__name__)
 
 router = Router()
-router.message.filter(F.chat.type == "private")
+router.message.filter(F.chat.type == ChatType.PRIVATE)
 
 
 @router.message(CommandStart())
 async def on_start_command(message: Message):
+    name = message.from_user.username if message.from_user.username else message.from_user.first_name
+    await add_user(message.from_user.id, name)
+
     text = ("Привет!\n"
             "Этот бот поможет добавить закрепленный пост с синей кнопкой в твой канал или группу.\n"
             "Просто действуй по инструкции и всё получится!")
@@ -35,13 +40,23 @@ async def on_start_command(message: Message):
 @router.callback_query(AddingConfirmed.filter())
 async def on_channel_confirmed(callback: CallbackQuery, callback_data: AddingConfirmed, state: FSMContext):
     await callback.message.delete_reply_markup()
-    state_data = await state.get_data()
-    channels = state_data.setdefault('channels', [])
-    channels.append(callback_data.model_dump_json())
-    await state.update_data(channels=channels)
+    status = await add_chat_to_user(user_tg_id=callback.from_user.id,
+                                    chat_tg_id=callback_data.id,
+                                    chat_name=callback_data.name)
 
-    await callback.bot.send_message(
-        chat_id=callback.from_user.id,
-        text=f"Канал {callback_data.name} добавлен!\n"
-             f"Вызови команду /send для отправки сообщения в канал!"
-    )
+    if status == AddChatStatus.USER_NOT_FOUND:
+        await callback.bot.send_message(chat_id=callback.from_user.id, text="Ошибка. Вызови /start")
+    elif status == AddChatStatus.CHAT_ALREADY_EXISTS:
+        await callback.bot.send_message(chat_id=callback.from_user.id, text="Оказывается, такой чат уже есть")
+    elif status == AddChatStatus.CHAT_ADDED:
+        await callback.bot.send_message(chat_id=callback.from_user.id,
+                                        text=f"Канал {callback_data.name} добавлен!\n"
+                                             f"Вызови команду /send для отправки сообщения в канал!")
+    elif status == AddChatStatus.ERROR_OCCURRED:
+        await callback.bot.send_message(chat_id=callback.from_user.id, text="Ошибка. Попробуй сделать все заново")
+
+
+@router.my_chat_member(ChatMemberUpdatedFilter(LEAVE_TRANSITION), F.chat.type == ChatType.PRIVATE)
+async def on_user_block_bot(event: ChatMemberUpdated):
+    logger.info(f"on_user_block_bot - {event.chat.id}")
+    await set_user_blocked(event.chat.id)
