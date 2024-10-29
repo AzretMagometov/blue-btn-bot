@@ -38,8 +38,8 @@ async def on_send_command(message: Message, state: FSMContext):
         for ch in channels:
             channel = json.loads(ch)
             builder.button(
-                text=channel['channel_name'],
-                callback_data=ChannelSelected(channel_id=channel['channel_id'], channel_name=channel['channel_name'])
+                text=channel['name'],
+                callback_data=ChannelSelected(channel_id=channel['id'], channel_name=channel['name'])
             )
         builder.adjust(1, 1)
 
