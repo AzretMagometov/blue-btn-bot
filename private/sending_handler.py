@@ -1,55 +1,19 @@
-import asyncio
 import json
 import logging
 
 from aiogram import Router, F
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import Command
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from channel.channel import ChannelConfirmed
-
 logger = logging.getLogger(__name__)
 
 router = Router()
 router.message.filter(F.chat.type == "private")
-
-
-@router.message(CommandStart())
-async def on_start_command(message: Message):
-    text = ("Привет!\n"
-            "Этот бот поможет добавить закрепленный пост с синей кнопкой в твой канал.\n"
-            "Просто действуй по инструкции и всё получится!")
-    await message.answer(text)
-
-    text = ("Сделай этого бота - @blue_btn_bot - администратором своего канала.\n"
-            "Дай ему возможность писать сообщения.\n"
-            "Вот видеоинструкция.\n")
-
-    add_bot_as_admin_file_id = "BAACAgIAAxkBAAMDZx6POUN3y-nQCT3fQmnFnkebo0YAAspVAAJ80fBIOSwF0jZaiE82BA"
-    add_bot_as_admin_file_unique_id = "AgADylUAAnzR8Eg"
-
-    await asyncio.sleep(5)
-    await message.answer_video(video=add_bot_as_admin_file_id, caption=text)
-
-
-@router.callback_query(ChannelConfirmed.filter())
-async def on_channel_confirmed(callback: CallbackQuery, callback_data: ChannelConfirmed, state: FSMContext):
-    await callback.message.delete_reply_markup()
-    state_data = await state.get_data()
-    channels = state_data.setdefault('channels', [])
-    channels.append(callback_data.model_dump_json())
-    await state.update_data(channels=channels)
-
-    await callback.bot.send_message(
-        chat_id=callback.from_user.id,
-        text=f"Канал {callback_data.channel_name} добавлен!\n"
-             f"Вызови команду /send для отправки сообщения в канал!"
-    )
 
 
 class ChannelSelected(CallbackData, prefix='ch_sel'):
@@ -163,7 +127,7 @@ async def on_send_message_confirmed(callback: CallbackQuery, state: FSMContext):
                 InlineKeyboardButton(text=data['send_btn_text'], url=data['send_btn_link'])).as_markup()
         )
 
-        await callback.bot.pin_chat_message(data['send_channel_id'], message_id.message_id)
+        await callback.bot.pin_chat_message(data['send_channel_id'], message_id.message_id, disable_notification=True)
 
         await callback.message.answer(f"Готово, можно проверять - {data['send_channel_name']}")
     except Exception as e:

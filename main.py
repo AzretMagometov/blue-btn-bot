@@ -1,13 +1,14 @@
 import asyncio
 
 from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.base import KeyBuilder, DefaultKeyBuilder
+from aiogram.fsm.storage.base import DefaultKeyBuilder
 from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
 from redis.asyncio import Redis
 
-import setup.onboarding
-import channel.channel
-
+import public.adding_handler
+import private.onboarding_handler
+import private.sending_handler
 from utils import setup_logging_base_config
 
 setup_logging_base_config()
@@ -20,10 +21,14 @@ async def main():
     dp = Dispatcher(storage=RedisStorage(redis=redis, key_builder=DefaultKeyBuilder(with_destiny=True)))
 
     dp.include_routers(
-        setup.onboarding.router,
-        channel.channel.router
+        private.onboarding_handler.router,
+        private.sending_handler.router,
+        public.adding_handler.router
     )
-    dp['redis'] = redis
+    await bot.set_my_commands([
+        BotCommand(command="/send", description="Отправить сообщение"),
+        BotCommand(command="/help", description="Поддержка"),
+    ], BotCommandScopeAllPrivateChats())
 
     await dp.start_polling(bot)
 

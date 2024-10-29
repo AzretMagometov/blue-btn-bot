@@ -1,54 +1,61 @@
 import logging
-import uuid
-from typing import Any, Union, Dict
 
 from aiogram import Router, F
-from aiogram.enums import ParseMode
-from aiogram.filters import Command, BaseFilter, ChatMemberUpdatedFilter, PROMOTED_TRANSITION
+from aiogram.enums import ParseMode, ChatType
+from aiogram.filters import Command, ChatMemberUpdatedFilter, PROMOTED_TRANSITION, LEAVE_TRANSITION
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import Message, InlineKeyboardButton, ChatMemberUpdated
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from redis.asyncio import Redis
-
-from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER
 
 # -1002210982753
 
 logger = logging.getLogger(__name__)
 
 router = Router()
-router.message.filter(F.chat.type == "channel")
+router.message.filter(F.chat.type != ChatType.PRIVATE)
 
 
-class ChannelConfirmed(CallbackData, prefix='ch_conf'):
-    channel_id: int
-    channel_name: str
+class AddingConfirmed(CallbackData, prefix='ch_conf'):
+    id: int
+    name: str
 
 
 @router.my_chat_member(ChatMemberUpdatedFilter(PROMOTED_TRANSITION))
-async def on_user_join(event: ChatMemberUpdated):
+async def on_bot_promoted(event: ChatMemberUpdated):
+    logger.info("on_bot_promoted - %s", event.model_dump_json(indent=4, exclude_none=True))
+
     chat_id = event.chat.id
-    chat_name = f"@{event.chat.username}"
+    chat_name = f"@{event.chat.username}" if event.chat.username else event.chat.title
 
     user_id = event.from_user.id
 
-    markup = InlineKeyboardBuilder().add(
-        InlineKeyboardButton(text="Да!",
-                             callback_data=ChannelConfirmed(channel_id=chat_id,
-                                                            channel_name=chat_name).pack())).as_markup()
+    markup = (InlineKeyboardBuilder()
+              .add(InlineKeyboardButton(text="Да!",
+                                        callback_data=AddingConfirmed(id=chat_id, name=chat_name).pack()))
+              .as_markup())
+    in_type = {
+        ChatType.GROUP: "в группе",
+        ChatType.SUPERGROUP: "в группе",
+        ChatType.CHANNEL: "в канале",
+    }
 
     await event.bot.send_message(
         chat_id=user_id,
-        text=f"Похоже, что ты собираешься подключить канал <b>{chat_name}</b>.\n"
+        text=f"Похоже, что ты сделал бота админом {in_type[event.chat.type]} <b>{chat_name}</b>.\n"
              f"Нажми на кнопку, чтобы продолжить",
         parse_mode=ParseMode.HTML,
         reply_markup=markup
     )
 
 
-@router.message(Command('link_channel'))
-async def on_link_channel_command(message: Message):
-    logger.info(message.model_dump_json(indent=4, exclude_none=True))
+async def handle_bot_kicked(id: int):
+    pass
+
+
+@router.my_chat_member(ChatMemberUpdatedFilter(LEAVE_TRANSITION))
+async def on_bot_kicked(event: ChatMemberUpdated):
+    logger.info("on_bot_kicked - %s", event.model_dump_json(indent=4, exclude_none=True))
+    await handle_bot_kicked(event.chat.id)
 
 # channel_id = -1002210982753
 
