@@ -2,9 +2,8 @@ import asyncio
 import logging
 
 from aiogram import Router, F
-from aiogram.enums import ChatType
-from aiogram.filters import CommandStart, ChatMemberUpdatedFilter, LEAVE_TRANSITION
-from aiogram.fsm.context import FSMContext
+from aiogram.enums import ChatType, ParseMode
+from aiogram.filters import CommandStart, ChatMemberUpdatedFilter, LEAVE_TRANSITION, Command
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
 
 from database.repo import add_user, add_chat_to_user, AddChatStatus, set_user_blocked
@@ -38,7 +37,7 @@ async def on_start_command(message: Message):
 
 
 @router.callback_query(AddingConfirmed.filter())
-async def on_channel_confirmed(callback: CallbackQuery, callback_data: AddingConfirmed, state: FSMContext):
+async def on_channel_confirmed(callback: CallbackQuery, callback_data: AddingConfirmed):
     await callback.message.delete_reply_markup()
     status = await add_chat_to_user(user_tg_id=callback.from_user.id,
                                     chat_tg_id=callback_data.id,
@@ -60,3 +59,15 @@ async def on_channel_confirmed(callback: CallbackQuery, callback_data: AddingCon
 async def on_user_block_bot(event: ChatMemberUpdated):
     logger.info(f"on_user_block_bot - {event.chat.id}")
     await set_user_blocked(event.chat.id)
+
+
+@router.message(Command('help'))
+async def on_help_command(message: Message):
+    await message.answer(
+        text="Автор: <b>Азрет Магометов</b>\n"
+             "Пиши в <a href='https://t.me/azret_magometov'>личку</a>, если есть вопросы, пожелания "
+             "или идеи для сотрудничества.\n"
+             "Заходи за эксклюзивами и подписывайся на мой <a href='https://t.me/itshifter'>канал</a>, "
+             "мне будет приятно!",
+        parse_mode=ParseMode.HTML
+    )
