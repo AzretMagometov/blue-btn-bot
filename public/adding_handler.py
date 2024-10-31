@@ -17,17 +17,15 @@ router = Router()
 router.message.filter(F.chat.type != ChatType.PRIVATE)
 
 
-class AddingConfirmed(CallbackData, prefix='ch_conf'):
+class AddingConfirmed(CallbackData, prefix='cc'):
     id: int
     name: str
 
 
 @router.my_chat_member(ChatMemberUpdatedFilter(PROMOTED_TRANSITION))
 async def on_bot_promoted(event: ChatMemberUpdated):
-    logger.info("on_bot_promoted - %s", event.model_dump_json(indent=4, exclude_none=True))
-
     chat_id = event.chat.id
-    chat_name = f"@{event.chat.username}" if event.chat.username else event.chat.title
+    chat_name = f"@{event.chat.username}" if event.chat.username else event.chat.title[:15]
 
     user_id = event.from_user.id
 
