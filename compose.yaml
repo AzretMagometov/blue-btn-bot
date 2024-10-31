@@ -19,7 +19,8 @@ services:
     command: >
       sh -c "alembic upgrade head &&
              python main.py"
-
+    networks:
+      - backend
 
   db:
     image: postgres:alpine
@@ -30,22 +31,30 @@ services:
       POSTGRES_DB: blue_btn_db
     env_file:
       - .env
-    ports:
-      - '5435:5432'
+#    ports:
+#      - '5435:5432'
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
   redis:
     image: redis:5-alpine
     restart: on-failure
     volumes:
       - redis-data:/data
-    ports:
-      - '6377:6379'
+#    ports:
+#      - '6377:6379'
+    networks:
+      - backend
 
 volumes:
   postgres-data:
   redis-data:
+
+networks:
+  backend:
+    driver: bridge
